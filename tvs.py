@@ -356,6 +356,40 @@ def print_state(api_url):
     print(f"RA/Dec/RotSkyPos:   {ra_str:>13s}   {dec_str:>12s}   {rsp_str:>11s}")
 
 
+def set_view_to_camera(api_url):
+    """Set Stellarium view to camera.
+
+    Parameters
+    ----------
+    api_url : str
+        URL of Stellarium API.
+    """
+    requests.post(
+        f"{api_url}/api/stelaction/do", data={"id": "actionSetViewToCamera"}
+    )
+
+
+def set_stellarium_time(api_url, time, timerate=None):
+    """Set Stellarium time.
+
+    Parameters
+    ----------
+    api_url : str
+        URL of Stellarium API.
+    time : astropy.time.Time
+        Time to set.
+    timerate : float, optional
+        Timerate to set in days per second.  Default is None, which does not set the
+        timerate.
+    """
+    data = {"time": time.mjd + 2400000.5}
+    if timerate is not None:
+        data["timerate"] = timerate
+    requests.post(
+        f"{api_url}/api/main/time",
+        data=data
+    )
+
 @click.group()
 @click.option(
     "--url",
@@ -449,10 +483,7 @@ def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
 
     if time is not None:
         t = Time(time, format=timeformat)
-        requests.post(
-            f"{api_url}/api/main/time",
-            data={"time": t.mjd + 2400000.5},
-        )
+        set_stellarium_time(api_url, t)
 
     if horizon:
         # Interpret lon/lat/rot as Az/Alt/RotTelPos
@@ -485,9 +516,7 @@ def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
 
     slew_to(api_url, camera, ra, dec, rsp)
     if not no_follow:
-        requests.post(
-            f"{api_url}/api/stelaction/do", data={"id": "actionSetViewToCamera"}
-        )
+        set_view_to_camera(api_url)
 
     print_state(api_url)
 
@@ -568,10 +597,7 @@ def target(ctx, name, rot, time, timeformat, camera, horizon, no_follow):
 
     if time is not None:
         t = Time(time, format=timeformat)
-        requests.post(
-            f"{api_url}/api/main/time",
-            data={"time": t.mjd + 2400000.5},
-        )
+        set_stellarium_time(api_url, t)
 
     simbad = Simbad()
     simbad.add_votable_fields("ra", "dec")
@@ -599,9 +625,7 @@ def target(ctx, name, rot, time, timeformat, camera, horizon, no_follow):
 
     slew_to(api_url, "LSSTCam" if camera == "ComCam" else camera, ra, dec, rsp)
     if not no_follow:
-        requests.post(
-            f"{api_url}/api/stelaction/do", data={"id": "actionSetViewToCamera"}
-        )
+        set_view_to_camera(api_url)
     print_state(api_url)
 
 
@@ -695,18 +719,9 @@ def visit(ctx, visit, camera, rsp_token, rsp_server, no_follow):
         Angle(data["sky_rotation"] * u.deg),
     )
     # Set visit time and pause with timerate=0
-    requests.post(
-        f"{api_url}/api/main/time",
-        data={
-            "time": data["exp_midpt_mjd"] + 2400000.5,
-            "timerate": 0,
-        },
-    )
+    set_stellarium_time(api_url, Time(data["exp_midpt_mjd"], format="mjd"), timerate=0)
     if not no_follow:
-        requests.post(
-            f"{api_url}/api/stelaction/do",
-            data={"id": "actionSetViewToCamera"},
-        )
+        set_view_to_camera(api_url)
     print_state(api_url)
 
 
@@ -795,12 +810,10 @@ def replay(
     visit0 = visits[
         np.logical_or(visits["img_type"] == "OBJECT", visits["img_type"] == "ACQ")
     ][0]
-    requests.post(
-        f"{api_url}/api/main/time",
-        data={
-            "time": visit0["exp_midpt_mjd"] + 2400000.5,
-            "timerate": 100 / 86400,
-        },
+    set_stellarium_time(
+        api_url,
+        Time(visit0["exp_midpt_mjd"], format="mjd"),
+        timerate=100 / 86400,
     )
 
     currentindex = None
@@ -838,10 +851,7 @@ def replay(
             Angle(visit["sky_rotation"] * u.deg),
         )
         if not no_follow:
-            requests.post(
-                f"{api_url}/api/stelaction/do",
-                data={"id": "actionSetViewToCamera"},
-            )
+            set_view_to_camera(api_url)
 
 
 def query_efd_retry(efd, topic, time):
@@ -931,10 +941,7 @@ def follow(ctx, camera, rsp_server, delay, no_follow):
 
         slew_to(api_url, "LSSTCam" if camera == "ComCam" else camera, ra, dec, rsp)
         if not no_follow:
-            requests.post(
-                f"{api_url}/api/stelaction/do",
-                data={"id": "actionSetViewToCamera"},
-            )
+            set_view_to_camera(api_url)
         print_state(api_url)
         sleep(delay)
 
