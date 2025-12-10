@@ -436,7 +436,29 @@ def print_state(api_url):
         * np.cos(data["az"])
         / np.cos(data["alt"])
     )
-    cprint(f"Rotator speed: {rot_speed.to(u.deg/u.s):>10.5f}", "bright_red")
+    alt_speed = (
+        Angle("360d")
+        / u.day
+        * np.cos(RUBIN_OBSERVATORY.lat)
+        * np.sin(data["az"])
+    )
+    az_speed = (
+        Angle("360d")
+        / u.day
+        * (
+            np.sin(RUBIN_OBSERVATORY.lat)
+            - np.cos(RUBIN_OBSERVATORY.lat) * np.tan(data["alt"]) * np.cos(data["az"])
+        )
+    )
+
+    rot_vel_str = f"{rot_speed.to(u.arcsec/u.s).value:>7.2f}"
+    alt_vel_str = f"{alt_speed.to(u.arcsec/u.s).value:>7.2f}"
+    az_vel_str = f"{az_speed.to(u.arcsec/u.s).value:>7.2f}"
+    cprint(
+        f"Az/Alt/Rot rate [\" / s]: "
+        f"{rot_vel_str:7s}        {alt_vel_str:7s}     {az_vel_str:7s}",
+        "bright_red"
+    )
 
 
 def set_view_to_camera(api_url):
