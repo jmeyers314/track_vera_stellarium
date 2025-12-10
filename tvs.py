@@ -947,10 +947,8 @@ def replay(
         f" and day_obs <= {day_obs_end}"
     )
 
-    # Set stellarium time to first visit with img_type either OBJECT or ACQ
-    visit0 = visits[
-        np.logical_or(visits["img_type"] == "OBJECT", visits["img_type"] == "ACQ")
-    ][0]
+    # Set stellarium time to first visit with can_see_sky True
+    visit0 = visits[visits["can_see_sky"]][0]
     set_stellarium_time(
         api_url,
         Time(visit0["exp_midpt_mjd"], format="mjd"),
