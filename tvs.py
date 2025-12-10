@@ -982,6 +982,7 @@ def replay(
                 ]
             ]
         )
+        print_state(api_url)
         slew_to(
             api_url,
             "LSSTCam" if camera == "ComCam" else camera,
