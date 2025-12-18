@@ -412,11 +412,17 @@ def print_state(api_url):
     )
 
     print(f"Camera: {data['current_camera']}")
-    cprint(f"Time: {data['time'].iso} UTC", "yellow")
     cprint(
-        f"parallactic angle:                                 {data['q'].deg:8.3f} deg",
+        f"Time: {data['time'].iso} UTC            "
+        f"LAST: {data['last'].hour:6.3f} hours",
+        "yellow",
+    )
+    cprint(
+        f"HA:   {data['ha'].hour:6.3f} hours              "
+        f"parallactic angle: {data['q'].deg:8.3f} deg",
         "bright_magenta",
     )
+
     az_str = data["az"].to_string(**to_string_kwargs)
     alt_str = data["alt"].to_string(**to_string_kwargs)
     rtp_str = f"{data['rtp'].deg:8.3f} deg"
@@ -440,10 +446,7 @@ def print_state(api_url):
         / np.cos(data["alt"])
     )
     alt_speed = (
-        Angle("360d")
-        / u.day
-        * np.cos(RUBIN_OBSERVATORY.lat)
-        * np.sin(data["az"])
+        Angle("360d") / u.day * np.cos(RUBIN_OBSERVATORY.lat) * np.sin(data["az"])
     )
     az_speed = (
         Angle("360d")
@@ -458,9 +461,9 @@ def print_state(api_url):
     alt_vel_str = f"{alt_speed.to(u.arcsec/u.s).value:>7.2f}"
     az_vel_str = f"{az_speed.to(u.arcsec/u.s).value:>7.2f}"
     cprint(
-        f"Az/Alt/Rot rate [\" / s]: "
+        f'Az/Alt/Rot rate [" / s]: '
         f"{rot_vel_str:7s}        {alt_vel_str:7s}     {az_vel_str:7s}",
-        "bright_red"
+        "bright_red",
     )
 
 
