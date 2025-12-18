@@ -545,15 +545,33 @@ def cli(ctx, url):
     "(RA/Dec/RotSkyPos).",
 )
 @click.option(
+    "--rtp",
+    is_flag=True,
+    help="Interpret ROT as RotTelPos regardless of --horizon.",
+)
+@click.option(
+    "--rsp",
+    is_flag=True,
+    help="Interpret ROT as RotSkyPos regardless of --horizon.",
+)
+@click.option(
+    "--ha",
+    is_flag=True,
+    help="Interpret LON as Hour Angle instead of Right Ascension.  "
+    "Only valid when --horizon is not set.",
+)
+@click.option(
     "--no-follow",
     is_flag=True,
     help="Do not follow the slew with a Stellarium view change.",
 )
 @click.pass_context
-def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
+def slew(
+    ctx, lon, lat, rot, time, timeformat, camera, horizon, rtp, rsp, ha, no_follow
+):
     """Slew mosaic to given position and rotation.
 
-    LON is the longitudinal angle (RA or Az).
+    LON is the longitudinal angle (HA, RA, or Az).
 
     LAT is the latitudinal angle (Dec or Alt).
 
@@ -561,11 +579,20 @@ def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
 
     These may be specified in any format that astropy.units.Angle can parse.
 
+    Note that LON without explicit units is interpreted as degrees when --horizon is
+    set (i.e., as Az), and as hours otherwise (i.e., as RA or HA).
+
     Some examples:
 
         python tvs.py slew 12:34:56.7 -12:34:56.7 45
 
         python tvs.py slew 12:34:56.7 -12:34:56.7 45 --horizon
+
+        python tvs.py slew 12:34:56.7 -12:34:56.7 45 --horizon --rsp
+
+        python tvs.py slew 12:34:56.7 -12:34:56.7 45 --rtp
+
+        python tvs.py slew 12:34:56.7 -12:34:56.7 45 --rtp --ha
 
         python tvs.py slew 12h34m56.7 -12d34m56.7 45deg
 
@@ -592,13 +619,12 @@ def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
         t = Time(time, format=timeformat)
         set_stellarium_time(api_url, t)
 
+    set_camera(api_url, camera)
+    data = get_stellarium_attributes(api_url)
     if horizon:
         # Interpret lon/lat/rot as Az/Alt/RotTelPos
         alt = parse_angle(lat)
         az = parse_angle(lon)
-
-        set_camera(api_url, camera)
-        data = get_stellarium_attributes(api_url)
         coord = SkyCoord(
             alt=alt,
             az=az,
@@ -608,20 +634,30 @@ def slew(ctx, lon, lat, rot, time, timeformat, camera, horizon, no_follow):
         ra = coord.icrs.ra
         dec = coord.icrs.dec
         if rot is None:  # Keep current rtp
-            rtp = data["rtp"]
+            rotTelPos = data["rtp"]
         else:
-            rtp = parse_angle(rot)
-        rsp = q - rtp - 90 * u.deg
+            if rsp:
+                rotTelPos = q - parse_angle(rot) - 90 * u.deg
+            else:
+                rotTelPos = parse_angle(rot)
+        rotSkyPos = q - rotTelPos - 90 * u.deg
     else:
-        # Interpret lon/lat/rot as RA/Dec/RotSkyPos
-        ra = parse_angle(lon, unit=u.hour)
+        # Interpret lon/lat/rot as (RA or HA)/Dec/RotSkyPos
+        if ha:
+            ra = data["last"] - parse_angle(lon, unit=u.hour)
+        else:
+            ra = parse_angle(lon, unit=u.hour)
         dec = parse_angle(lat)
         if rot is None:  # Keep current rsp
-            rsp = get_stellarium_attributes(api_url)["rsp"]
+            rotSkyPos = data["rsp"]
         else:
-            rsp = parse_angle(rot)
-
-    slew_to(api_url, camera, ra, dec, rsp)
+            if rtp:
+                coord = SkyCoord(ra=ra, dec=dec)
+                q = parallactic_angle(coord, data["time"])
+                rotSkyPos = q - parse_angle(rot) - 90 * u.deg
+            else:
+                rotSkyPos = parse_angle(rot)
+    slew_to(api_url, camera, ra, dec, rotSkyPos)
     if not no_follow:
         set_view_to_camera(api_url)
 
