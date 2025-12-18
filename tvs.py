@@ -311,6 +311,8 @@ def get_stellarium_attributes(url):
         Dictionary with structure:
             time: astropy.time.Time
                 Time in Stellarium.
+            last: astropy.coordinates.Angle
+                Local apparent sidereal time at Rubin Observatory.
             current_camera: str
                 Current camera in Stellarium.
             az: astropy.coordinates.Angle
@@ -327,6 +329,8 @@ def get_stellarium_attributes(url):
                 Declination of current camera.
             rtp: astropy.coordinates.Angle
                 Rotator position (RotTelPos) of current camera.
+            ha: astropy.coordinates.Angle
+                Hour angle of current camera.
     """
     time = Time(
         requests.get(f"{url}/api/main/status").json()["time"]["jday"], format="jd"
@@ -350,6 +354,8 @@ def get_stellarium_attributes(url):
     rsp = Angle(rsp, unit=u.deg).wrap_at("360d")
     coord = SkyCoord(ra=ra, dec=dec)
     aa = coord.transform_to(AltAz(obstime=time, location=RUBIN_OBSERVATORY))
+    last = Time(time, location=RUBIN_OBSERVATORY).sidereal_time("apparent")
+    ha = last - ra
     alt = aa.alt
     az = aa.az.wrap_at("180d")
     q = parallactic_angle(coord, time).wrap_at("360d")
@@ -357,6 +363,7 @@ def get_stellarium_attributes(url):
     rtp = rtp.wrap_at("90d")  # Should always be between -90 and +90 degrees
     return dict(
         time=time,
+        last=last,
         current_camera=current_camera,
         az=az,
         alt=alt,
@@ -365,6 +372,7 @@ def get_stellarium_attributes(url):
         ra=ra,
         dec=dec,
         rtp=rtp,
+        ha=ha,
     )
 
 
