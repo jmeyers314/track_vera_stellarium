@@ -32,12 +32,12 @@ RUBIN_OBSERVATORY = EarthLocation(
 
 
 # Cribbing some items from https://github.com/lsst-sims/rubin_nights
-def get_access_token(tokenfile: str | None = None) -> str:
+def get_access_token(tokenfile: str | Path | None = None) -> str:
     """Retrieve RSP access token.
 
     Parameters
     ----------
-    tokenfile : `str` or None
+    tokenfile : `str`, `Path`, or None
         Path to token file.
         Default None will fall back to environment variable,
         ACCESS_TOKEN and then try lsst.rsp.get_access_token().
@@ -55,20 +55,15 @@ def get_access_token(tokenfile: str | None = None) -> str:
         token = rsp_get_access_token(tokenfile=tokenfile)
     except ImportError:
         # No lsst-rsp available
-        if tokenfile is not None:
-            tokenfile = Path(tokenfile).expanduser()
-            if tokenfile.exists():
-                with open(tokenfile, "r") as f:
-                    token = f.read().strip()
-        else:
-            # Try default token file
-            tokenfile = Path(DEFAULT_RSP_TOKEN_PATH).expanduser()
-            if tokenfile.exists():
-                with open(tokenfile, "r") as f:
-                    token = f.read().strip()
+        token_path = (
+            Path(tokenfile) if tokenfile is not None else Path(DEFAULT_RSP_TOKEN_PATH)
+        ).expanduser()
+        if token_path.exists():
+            with open(token_path, "r") as f:
+                token = f.read().strip()
         if token is None:
             # Try using environment variable
-            token = os.environ.get("ACCESS_TOKEN")
+            token = os.environ.get("ACCESS_TOKEN", None)
 
     if token is None:
         print("No RSP token available.")
