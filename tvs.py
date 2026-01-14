@@ -340,14 +340,19 @@ def get_stellarium_attributes(url):
     dec = properties["MosaicCamera.dec"]["value"]
     rsp = properties["MosaicCamera.rotation"]["value"]
     current_camera = properties["MosaicCamera.currentCamera"]["value"]
+    it = 0
     while any(x is None for x in [ra, dec, rsp, current_camera]):
         print("Waiting for Stellarium...")
+        print(f"ra: {ra}, dec: {dec}, rsp: {rsp}, current_camera: {current_camera}")
         sleep(0.5)
         properties = requests.get(f"{url}/api/stelproperty/list").json()
         ra = properties["MosaicCamera.ra"]["value"]
         dec = properties["MosaicCamera.dec"]["value"]
         rsp = properties["MosaicCamera.rotation"]["value"]
         current_camera = properties["MosaicCamera.currentCamera"]["value"]
+        it += 1
+        if it >= 5:
+            raise RuntimeError("Failed to get camera attributes from Stellarium.")
 
     ra = Angle(ra * u.deg).wrap_at("360d")
     dec = Angle(dec * u.deg)
@@ -401,7 +406,11 @@ def cprint(text, color=None):
 
 
 def print_state(api_url):
-    data = get_stellarium_attributes(api_url)
+    try:
+        data = get_stellarium_attributes(api_url)
+    except RuntimeError:
+        cprint("Failed to get Stellarium attributes.", "bright_red")
+        return
 
     to_string_kwargs = dict(
         unit=u.deg,
@@ -749,8 +758,8 @@ def target(ctx, name, rot, time, timeformat, camera, horizon, no_follow):
     ra = Angle(result["ra"].data[0] * u.deg)
     dec = Angle(result["dec"].data[0] * u.deg)
 
+    data = get_stellarium_attributes(api_url)
     if horizon:
-        data = get_stellarium_attributes(api_url)
         time = data["time"]
         coord = SkyCoord(ra=ra, dec=dec, frame=ICRS)
         q = parallactic_angle(coord, time)
@@ -761,7 +770,7 @@ def target(ctx, name, rot, time, timeformat, camera, horizon, no_follow):
         rsp = q - rtp - 90 * u.deg
     else:
         if rot is None:  # Keep current rsp
-            rsp = get_stellarium_attributes(api_url)["rsp"]
+            rsp = data["rsp"]
         else:
             rsp = parse_angle(rot)
 
