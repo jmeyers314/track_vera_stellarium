@@ -997,6 +997,10 @@ def replay(
         f"select * from {database}.visit1 where day_obs >= {day_obs_begin}"
         f" and day_obs <= {day_obs_end}"
     )
+    visits["s_ra"] = visits["s_ra"].astype(float)
+    visits["s_dec"] = visits["s_dec"].astype(float)
+    visits["sky_rotation"] = visits["sky_rotation"].astype(float)
+    visits["exp_midpt_mjd"] = visits["exp_midpt_mjd"].astype(float)
 
     # Set stellarium time to first visit with can_see_sky True
     visit0 = visits[visits["can_see_sky"]][0]
@@ -1034,6 +1038,11 @@ def replay(
             ]
         )
         print_state(api_url)
+        if not all(
+            np.isfinite([visit[k] for k in ["s_ra", "s_dec", "sky_rotation"]])
+        ):
+            print("Skipping visit with non-finite coordinates")
+            continue
         slew_to(
             api_url,
             "LSSTCam" if camera == "ComCam" else camera,
